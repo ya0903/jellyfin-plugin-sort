@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Rating Sort</title>
+</head>
+<body>
+    <div id="RatingSortConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-checkbox,emby-select">
+        <div data-role="content">
+            <div class="content-primary">
+                <form id="RatingSortConfigForm">
+                    <div class="verticalSection">
+                        <h2>Rating Sort</h2>
+                        <p>Fetch IMDb and Letterboxd ratings from MDBList and write them into Jellyfin sortable rating fields.</p>
+                    </div>
+
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="ratingSortApiKey">MDBList API key</label>
+                        <input id="ratingSortApiKey" is="emby-input" type="password" autocomplete="off" />
+                        <div class="fieldDescription">Used with https://api.mdblist.com/tmdb/movie|show/{id}</div>
+                    </div>
+
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="ratingSortInterval">Refresh interval hours</label>
+                        <input id="ratingSortInterval" is="emby-input" type="number" min="1" step="1" />
+                    </div>
+
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="ratingSortDelay">Request delay milliseconds</label>
+                        <input id="ratingSortDelay" is="emby-input" type="number" min="0" step="50" />
+                    </div>
+
+                    <div class="selectContainer">
+                        <label class="selectLabel" for="ratingSortUiMode">Web UI labels</label>
+                        <select id="ratingSortUiMode" is="emby-select">
+                            <option value="Auto">Auto/File Transformation</option>
+                            <option value="ManualScript">Manual JS snippet</option>
+                            <option value="Disabled">Disabled</option>
+                        </select>
+                        <div class="fieldDescription">Backend sorting works even when web labels are disabled.</div>
+                    </div>
+
+                    <div class="verticalSection">
+                        <h3>Libraries</h3>
+                        <div id="ratingSortLibraries"></div>
+                        <div class="fieldDescription">If nothing is selected, all movie and show libraries are included.</div>
+                    </div>
+
+                    <div class="verticalSection">
+                        <h3>Status</h3>
+                        <div id="ratingSortStatus" class="fieldDescription">Loading...</div>
+                    </div>
+
+                    <div class="verticalSection">
+                        <h3>Manual JavaScript</h3>
+                        <textarea id="ratingSortScript" is="emby-textarea" readonly style="min-height: 10em;"></textarea>
+                    </div>
+
+                    <div>
+                        <button is="emby-button" type="submit" class="raised button-submit block">
+                            <span>Save</span>
+                        </button>
+                        <button id="ratingSortRefresh" is="emby-button" type="button" class="raised block">
+                            <span>Refresh Now</span>
+                        </button>
+                        <button id="ratingSortRestore" is="emby-button" type="button" class="raised block">
+                            <span>Restore Original Ratings</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <script type="text/javascript">
+            (() => {
+                const pluginId = '0ddf0a90-7a30-4e32-b291-9d761c277b1a';
+
+                function apiUrl(path) {
+                    return ApiClient.getUrl(path);
+                }
+
+                function request(path, options) {
+                    options = options || {};
+                    return ApiClient.ajax({
+                        type: options.method || 'GET',
+                        url: apiUrl(path),
+                        dataType: options.dataType || 'json'
+                    });
+                }
+
+                function selectedLibraryIds(page) {
+                    return Array.prototype.slice.call(page.querySelectorAll('.ratingSortLibrary:checked')).map(i => i.value);
+                }
+
+                function renderStatus(page, status) {
+                    const el = page.querySelector('#ratingSortStatus');
+                    const parts = [];
+                    if (status.lastRunCompletedUtc) parts.push('Last refresh: ' + new Date(status.lastRunCompletedUtc).toLocaleString());
+                    if (status.lastRestoreCompletedUtc) parts.push('Last restore: ' + new Date(status.lastRestoreCompletedUtc).toLocaleString());
+                    parts.push('Updated: ' + (status.updatedCount || 0));
+                    parts.push('Skipped: ' + (status.skippedCount || 0));
+                    parts.push('Errors: ' + (status.errorCount || 0));
+                    if (status.lastMessage) parts.push(status.lastMessage);
+                    el.textContent = parts.join(' | ');
+                }
+
+                async function loadLibraries(page, config) {
+                    const host = page.querySelector('#ratingSortLibraries');
+                    host.innerHTML = '';
+                    const libraries = await request('RatingSort/Libraries');
+                    const enabled = new Set(config.EnabledLibraryIds || config.enabledLibraryIds || []);
+
+                    libraries.forEach(library => {
+                        const label = document.createElement('label');
+                        label.className = 'checkboxContainer';
+                        const input = document.createElement('input');
+                        input.type = 'checkbox';
+                        input.className = 'ratingSortLibrary';
+                        input.setAttribute('is', 'emby-checkbox');
+                        input.value = library.id || library.Id;
+                        input.checked = enabled.has(input.value);
+                        const span = document.createElement('span');
+                        span.textContent = (library.name || library.Name) + ' (' + (library.collectionType || library.CollectionType) + ')';
+                        label.appendChild(input);
+                        label.appendChild(span);
+                        host.appendChild(label);
+                    });
+                }
+
+                async function loadStatus(page) {
+                    renderStatus(page, await request('RatingSort/Status'));
+                }
+
+                async function loadScript(page) {
+                    page.querySelector('#ratingSortScript').value = await request('RatingSort/WebScript', { dataType: 'text' });
+                }
+
+                document.querySelector('#RatingSortConfigPage').addEventListener('pageshow', async function () {
+                    Dashboard.showLoadingMsg();
+                    const page = this;
+                    try {
+                        const config = await ApiClient.getPluginConfiguration(pluginId);
+                        page.querySelector('#ratingSortApiKey').value = config.MdbListApiKey || config.mdbListApiKey || '';
+                        page.querySelector('#ratingSortInterval').value = config.RefreshIntervalHours || config.refreshIntervalHours || 24;
+                        page.querySelector('#ratingSortDelay').value = config.RequestDelayMs || config.requestDelayMs || 250;
+                        page.querySelector('#ratingSortUiMode').value = config.UiInjectionMode || config.uiInjectionMode || 'Auto';
+                        await loadLibraries(page, config);
+                        await loadStatus(page);
+                        await loadScript(page);
+                    } finally {
+                        Dashboard.hideLoadingMsg();
+                    }
+                });
+
+                document.querySelector('#RatingSortConfigForm').addEventListener('submit', async function (e) {
+                    e.preventDefault();
+                    Dashboard.showLoadingMsg();
+                    const page = document.querySelector('#RatingSortConfigPage');
+                    try {
+                        const config = await ApiClient.getPluginConfiguration(pluginId);
+                        config.MdbListApiKey = page.querySelector('#ratingSortApiKey').value || '';
+                        config.EnabledLibraryIds = selectedLibraryIds(page);
+                        config.RefreshIntervalHours = parseInt(page.querySelector('#ratingSortInterval').value || '24', 10);
+                        config.RequestDelayMs = parseInt(page.querySelector('#ratingSortDelay').value || '250', 10);
+                        config.UiInjectionMode = page.querySelector('#ratingSortUiMode').value || 'Auto';
+                        await ApiClient.updatePluginConfiguration(pluginId, config);
+                        Dashboard.processPluginConfigurationUpdateResult();
+                    } finally {
+                        Dashboard.hideLoadingMsg();
+                    }
+                    return false;
+                });
+
+                document.querySelector('#ratingSortRefresh').addEventListener('click', async function () {
+                    Dashboard.showLoadingMsg();
+                    const page = document.querySelector('#RatingSortConfigPage');
+                    try {
+                        await request('RatingSort/Refresh', { method: 'POST' });
+                        await loadStatus(page);
+                    } finally {
+                        Dashboard.hideLoadingMsg();
+                    }
+                });
+
+                document.querySelector('#ratingSortRestore').addEventListener('click', async function () {
+                    Dashboard.showLoadingMsg();
+                    const page = document.querySelector('#RatingSortConfigPage');
+                    try {
+                        await request('RatingSort/Restore', { method: 'POST' });
+                        await loadStatus(page);
+                    } finally {
+                        Dashboard.hideLoadingMsg();
+                    }
+                });
+            })();
+        </script>
+    </div>
+</body>
+</html>

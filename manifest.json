@@ -1,0 +1,20 @@
+[
+  {
+    "guid": "0ddf0a90-7a30-4e32-b291-9d761c277b1a",
+    "name": "Rating Sort",
+    "overview": "Sort Jellyfin movies and series by IMDb and Letterboxd ratings using Jellyfin's native sortable rating fields.",
+    "description": "Rating Sort fetches MDBList ratings for movies and TV series, writes IMDb into CommunityRating and Letterboxd into CriticRating, and optionally relabels the Jellyfin Web sort options through File Transformation.",
+    "owner": "ya0903",
+    "category": "General",
+    "versions": [
+      {
+        "version": "1.0.0.0",
+        "changelog": "Initial release.",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://raw.githubusercontent.com/ya0903/jellyfin-plugin-sort/main/dist/RatingSort_1.0.0.0.zip",
+        "checksum": "6272e8412500ed99512cd907dc86ead3",
+        "timestamp": "2026-04-25T00:00:00+00:00"
+      }
+    ]
+  }
+]
