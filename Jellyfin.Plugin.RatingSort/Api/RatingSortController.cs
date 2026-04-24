@@ -81,7 +81,6 @@ public sealed class RatingSortController : ControllerBase
     /// </summary>
     /// <returns>JavaScript.</returns>
     [HttpGet("WebScript")]
-    [AllowAnonymous]
     [Produces("application/javascript")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public ContentResult WebScript()

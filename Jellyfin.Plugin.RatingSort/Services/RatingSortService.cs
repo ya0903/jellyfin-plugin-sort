@@ -13,6 +13,8 @@ namespace Jellyfin.Plugin.RatingSort.Services;
 
 public sealed class RatingSortService
 {
+    private const float EmptySortRating = 0f;
+
     private readonly ILibraryManager _libraryManager;
     private readonly MdbListClient _mdbListClient;
     private readonly RatingBackupStore _backupStore;
@@ -214,7 +216,7 @@ public sealed class RatingSortService
         var tmdbId = item.GetProviderId(MetadataProvider.Tmdb);
         if (string.IsNullOrWhiteSpace(tmdbId))
         {
-            return ItemRefreshOutcome.Skipped;
+            return await ApplyRatingsAsync(item, EmptySortRating, EmptySortRating, cancellationToken).ConfigureAwait(false);
         }
 
         if (config.RequestDelayMs > 0)
@@ -230,14 +232,25 @@ public sealed class RatingSortService
 
         if (lookup.Data is null)
         {
-            return ItemRefreshOutcome.Skipped;
+            return lookup.StatusCode == 404
+                ? await ApplyRatingsAsync(item, EmptySortRating, EmptySortRating, cancellationToken).ConfigureAwait(false)
+                : ItemRefreshOutcome.Skipped;
         }
 
         var imdb = RatingNormalizer.GetCommunityRating0To10(lookup.Data, "imdb");
         var letterboxd = RatingNormalizer.GetCriticRating0To100(lookup.Data, "letterboxd");
 
-        var newCommunity = imdb;
-        var newCritic = letterboxd;
+        var newCommunity = imdb ?? EmptySortRating;
+        var newCritic = letterboxd ?? EmptySortRating;
+        return await ApplyRatingsAsync(item, newCommunity, newCritic, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<ItemRefreshOutcome> ApplyRatingsAsync(
+        BaseItem item,
+        float? newCommunity,
+        float? newCritic,
+        CancellationToken cancellationToken)
+    {
         var changed = !NullableEquals(item.CommunityRating, newCommunity) || !NullableEquals(item.CriticRating, newCritic);
 
         if (!changed)

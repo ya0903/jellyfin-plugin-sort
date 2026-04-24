@@ -25,9 +25,7 @@ if (Test-Path $zipPath) {
 
 $files = @(
     "Jellyfin.Plugin.RatingSort.dll",
-    "Jellyfin.Plugin.RatingSort.deps.json",
-    "Jellyfin.Plugin.RatingSort.pdb",
-    "Jellyfin.Plugin.RatingSort.xml"
+    "Jellyfin.Plugin.RatingSort.deps.json"
 )
 
 $missing = $files | Where-Object { -not (Test-Path (Join-Path $publishDir $_)) }

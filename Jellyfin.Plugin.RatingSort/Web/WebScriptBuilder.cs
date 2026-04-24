@@ -65,12 +65,14 @@ internal static class WebScriptBuilder
 
     public static string TransformIndexHtml(string html, Guid pluginId)
     {
-        if (html.Contains("RatingSort/WebScript", StringComparison.OrdinalIgnoreCase))
+        _ = pluginId;
+
+        if (html.Contains("window.__ratingSortLabelsInstalled", StringComparison.OrdinalIgnoreCase))
         {
             return html;
         }
 
-        var tag = $"<script defer src=\"/RatingSort/WebScript?plugin={pluginId:N}\"></script>";
+        var tag = "<script>" + Environment.NewLine + Build() + Environment.NewLine + "</script>";
         var bodyIndex = html.IndexOf("</body>", StringComparison.OrdinalIgnoreCase);
         return bodyIndex >= 0
             ? html.Insert(bodyIndex, tag)

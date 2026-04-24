@@ -7,7 +7,7 @@ The plugin fetches ratings from MDBList and writes them into Jellyfin's existing
 - IMDb -> `CommunityRating` as a `0-10` value.
 - Letterboxd -> `CriticRating` as a `0-100` value.
 
-Jellyfin already supports sorting by these fields, so sorting remains server-side and works with normal pagination. The optional web script only renames the visible sort labels in Jellyfin Web.
+Jellyfin already supports sorting by these fields, so sorting remains server-side and works with normal pagination. Missing external ratings are written as `0` so unrated items fall to the bottom when sorting ratings descending. The optional web script only renames the visible sort labels in Jellyfin Web.
 
 ## Requirements
 
@@ -38,7 +38,7 @@ Restart Jellyfin after installing the plugin.
 Download the packaged plugin zip:
 
 ```text
-https://raw.githubusercontent.com/ya0903/jellyfin-plugin-sort/main/dist/RatingSort_1.0.0.0.zip
+https://github.com/ya0903/jellyfin-plugin-sort/releases/download/v1.0.0/RatingSort_1.0.0.0.zip
 ```
 
 Extract it into a plugin folder under your Jellyfin plugins directory.
@@ -58,13 +58,19 @@ dotnet test Jellyfin.Plugin.RatingSort.sln -c Release
 .\scripts\package.ps1
 ```
 
-The Jellyfin repository manifest points at:
+The Jellyfin repository manifest is served from:
 
 ```text
-dist/RatingSort_1.0.0.0.zip
+https://raw.githubusercontent.com/ya0903/jellyfin-plugin-sort/main/manifest.json
 ```
 
-When making a new release, update `Version` in the project file, run `scripts/package.ps1`, then update `manifest.json` with the new zip name, MD5 checksum, version, and timestamp.
+The version entry in `manifest.json` points at an immutable GitHub release asset:
+
+```text
+https://github.com/ya0903/jellyfin-plugin-sort/releases/download/v1.0.0/RatingSort_1.0.0.0.zip
+```
+
+When making a new release, update `Version` in the project file, run `scripts/package.ps1`, create a matching GitHub release/tag, upload the zip from `dist`, then update `manifest.json` with the new release asset URL, MD5 checksum, version, and timestamp.
 
 ## Configure
 
@@ -77,7 +83,7 @@ Set:
 - Refresh interval and request delay.
 - Web UI label mode:
   - `Auto/File Transformation`: register an in-memory `index.html` transform when File Transformation is installed.
-  - `Manual JS snippet`: use the `/RatingSort/WebScript` output with JavaScript Injector or a userscript manager.
+  - `Manual JS snippet`: copy the authenticated `/RatingSort/WebScript` output from the plugin admin page into JavaScript Injector or a userscript manager.
   - `Disabled`: backend sorting still works, but labels remain Jellyfin's defaults.
 
 Then run `Refresh Now`, or run the scheduled task named `Update IMDb and Letterboxd sort ratings`.
